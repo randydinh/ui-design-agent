@@ -20,6 +20,8 @@ An exact `vMAJOR.MINOR.PATCH` tag resolves to an immutable Git commit before ins
 
 The installer inspects and validates a temporary checkout **before** registering the marketplace. It then calls the real Codex marketplace/add/list commands, verifies the installed cache against that checkout, and starts a fresh app-server session to confirm the enabled skill. It prints source, immutable commit, package version, installed path, and discovered skill. A discovery failure is an installation failure, even if Codex already registered the plugin; it does not promise atomic rollback. Inspect `codex plugin list --json` before retrying or removing that registration. Re-running the same pin validates the same contents.
 
+To change an already registered pin, first inspect `codex plugin list --marketplace ui-design-agents --json` and retain the old commit for recovery. Codex refuses to replace the same marketplace at a different ref. After reviewing the new commit, run `codex plugin marketplace remove ui-design-agents`, then rerun this installer with the new full commit. The installer deliberately reports that conflict rather than silently replacing a registration.
+
 For isolated installation evidence:
 
 ```sh
