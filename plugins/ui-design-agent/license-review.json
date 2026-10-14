@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "reviewed_at": "2026-10-14",
+  "determination": "compatible-for-public-redistribution-with-retained-component-licenses",
+  "distribution_model": "Separable unmodified upstream skill payloads plus MIT integration; component licenses are not replaced by root MIT license.",
+  "components": [
+    {
+      "name": "interface-design",
+      "source": "https://github.com/Dammyjay93/interface-design",
+      "commit": "2f9be3206855bcb2d1d0af262c8bae25cba6658d",
+      "license": "MIT",
+      "license_file": "skills/ui-design/vendor/interface-design/UPSTREAM-LICENSE",
+      "license_sha256": "54c405ef24e71634b73c994133d028e7a96d1906f42615366296d6583dcaba8f",
+      "obligations": [
+        "retain copyright and permission notice"
+      ]
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "source": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "commit": "7246805992a42b7bba37d4cac83b01416f0c6c44",
+      "license": "MIT",
+      "license_file": "skills/ui-design/vendor/ui-ux-pro-max/UPSTREAM-LICENSE",
+      "license_sha256": "738f69dfa83db5c347c678fb9d90e560877059f0de93a327c39001bff92dc014",
+      "obligations": [
+        "retain copyright and permission notice"
+      ]
+    },
+    {
+      "name": "impeccable",
+      "source": "https://github.com/pbakaus/impeccable",
+      "commit": "2f98774f86bc05563876643db37e6c37c322850f",
+      "license": "Apache-2.0",
+      "license_file": "skills/ui-design/vendor/impeccable/UPSTREAM-LICENSE",
+      "license_sha256": "02bb8c3b4e70190e3986c0404ad2fd8d639b4f534252d82379cc1b502b6d1812",
+      "obligations": [
+        "retain full Apache-2.0 license",
+        "retain source notices and upstream NOTICE",
+        "identify any modified upstream files; payload files unchanged",
+        "no trademark endorsement"
+      ]
+    }
+  ],
+  "findings": [
+    "MIT components permit redistribution and commercial use with retained notices.",
+    "Apache-2.0 component permits redistribution/commercial use subject to section 4; Apache terms remain in force for that component.",
+    "No copyleft or share-alike requirement was found in the reviewed MIT/Apache-2.0 texts.",
+    "Impeccable root NOTICE.md was found and is preserved as UPSTREAM-NOTICE.md; upstream identifies platform design references as MIT-derived.",
+    "MIT notices for modern-screenshot bundled JS and platform-design-skills-derived references are included in addition to upstream notices. Font/icon catalogs contain metadata rather than font binaries or icon artwork; original data provenance remains.",
+    "Optional external binary downloads are not part of the distributed payload or install verification; their redistribution is not claimed."
+  ],
+  "primary_references": [
+    "https://opensource.org/license/mit",
+    "https://www.apache.org/licenses/LICENSE-2.0",
+    "https://github.com/pbakaus/impeccable/blob/2f98774f86bc05563876643db37e6c37c322850f/NOTICE.md"
+  ],
+  "additional_notice_sources": [
+    {
+      "repo": "qq15725/modern-screenshot",
+      "commit": "792d6db7411839c62940a6e930161f8e376e817f",
+      "path": "LICENSE"
+    },
+    {
+      "repo": "ehmo/platform-design-skills",
+      "commit": "dc2be825d8b439caea78e9eaa8fb3ac23b0ff3e9",
+      "path": "LICENSE"
+    }
+  ]
+}

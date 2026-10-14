@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "plugin": "ui-design-agent",
+  "package_version": "0.1.0",
+  "intake_contract": "temari-conversational-sme-intake/v1",
+  "advisory_contract": "ui-design-advisory/v1",
+  "entry_skill": "skills/ui-design/SKILL.md",
+  "scope": "advisory",
+  "implementation_owner": "caller-poteto-workflow",
+  "acceptance_owner": "caller"
+}
