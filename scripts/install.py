@@ -60,12 +60,13 @@ def discover(codex, env, cwd, expected_skill):
     def reader():
         for line in process.stdout:
             if len(line) > 8_000_000:
-                messages.put({'error': 'response too large'})
+                messages.put(InstallError('app-server response exceeds size limit'))
                 break
             try:
                 messages.put(json.loads(line))
             except ValueError:
-                continue
+                messages.put(InstallError('app-server returned invalid JSON'))
+                break
         messages.put(None)
     threading.Thread(target=reader, daemon=True).start()
     def send(message):
@@ -82,9 +83,14 @@ def discover(codex, env, cwd, expected_skill):
                 break
             if item is None:
                 raise InstallError('app-server stopped before discovery')
+            if isinstance(item, InstallError):
+                raise item
+            require(isinstance(item, dict), 'app-server returned a non-object message')
             if item.get('id') == identifier:
                 require('error' not in item, 'app-server discovery RPC failed')
-                return item.get('result', {})
+                result = item.get('result')
+                require(isinstance(result, dict), 'app-server returned a non-object result')
+                return result
         raise InstallError('app-server discovery timed out')
     try:
         send({'id': 1, 'method': 'initialize', 'params': {'clientInfo': {'name': 'ui-design-agent-verifier', 'version': '0.1.0'}, 'capabilities': {'experimentalApi': True}}})
@@ -92,11 +98,19 @@ def discover(codex, env, cwd, expected_skill):
         send({'method': 'initialized'})
         send({'id': 2, 'method': 'skills/list', 'params': {'cwds': [str(cwd)], 'forceReload': True}})
         result = response(2)
-        entries = result.get('data', [])
+        entries = result.get('data')
+        require(isinstance(entries, list), 'skills/list data must be an array')
         skills = []
         for entry in entries:
-            require(not entry.get('errors'), 'fresh skill discovery returned errors')
-            skills.extend(entry.get('skills', []))
+            require(isinstance(entry, dict), 'skills/list entry must be an object')
+            require(isinstance(entry.get('errors'), list), 'skills/list errors must be an array')
+            require(not entry['errors'], 'fresh skill discovery returned errors')
+            entry_skills = entry.get('skills')
+            require(isinstance(entry_skills, list), 'skills/list skills must be an array')
+            for skill in entry_skills:
+                require(isinstance(skill, dict), 'skills/list skill must be an object')
+                require(isinstance(skill.get('name'), str) and isinstance(skill.get('path'), str) and isinstance(skill.get('enabled'), bool), 'skills/list skill metadata has invalid types')
+            skills.extend(entry_skills)
         matches = [s for s in skills if s.get('name') in ('ui-design', 'ui-design-agent:ui-design') and Path(s.get('path', '')).resolve() == expected_skill.resolve()]
         require(len(matches) == 1 and matches[0].get('enabled') is True, 'installed UI Design skill missing, disabled, duplicated, or path mismatch')
         return matches[0]['name']
@@ -114,20 +128,15 @@ def discover(codex, env, cwd, expected_skill):
             process.stdout.close()
 
 def enabled_plugin(data):
-    # Codex CLI returns an array of marketplace records or a plugin collection.
-    if isinstance(data, dict):
-        if data.get('name') == 'ui-design-agent' and data.get('enabled') is True:
-            return data
-        for value in data.values():
-            match = enabled_plugin(value)
-            if match:
-                return match
-    if isinstance(data, list):
-        for value in data:
-            match = enabled_plugin(value)
-            if match:
-                return match
-    return None
+    require(isinstance(data, dict), 'plugin list must return an object')
+    installed = data.get('installed')
+    require(isinstance(installed, list), 'plugin list installed must be an array')
+    for item in installed:
+        require(isinstance(item, dict), 'plugin list entry must be an object')
+        require(isinstance(item.get('name'), str) and isinstance(item.get('enabled'), bool), 'plugin list entry metadata has invalid types')
+    matches = [item for item in installed if item['name'] == 'ui-design-agent' and item['enabled']]
+    require(len(matches) <= 1, 'plugin list contains duplicate enabled UI Design entries')
+    return matches[0] if matches else None
 
 def install(source, ref, codex='codex', codex_home=None):
     source_url(source)
@@ -150,18 +159,22 @@ def install(source, ref, codex='codex', codex_home=None):
             package = checkout / 'plugins/ui-design-agent'
             checked = verify(package)
             marketplace = json.loads((checkout / '.agents/plugins/marketplace.json').read_text())
-            require(marketplace.get('name') == MARKETPLACE and len(marketplace.get('plugins', [])) == 1, 'unexpected marketplace')
+            require(isinstance(marketplace, dict), 'marketplace must be an object')
+            require(isinstance(marketplace.get('plugins'), list), 'marketplace plugins must be an array')
+            require(marketplace.get('name') == MARKETPLACE and len(marketplace['plugins']) == 1, 'unexpected marketplace')
             item = marketplace['plugins'][0]
+            require(isinstance(item, dict), 'marketplace entry must be an object')
             require(item.get('name') == 'ui-design-agent' and item.get('source') == {'source': 'local', 'path': './plugins/ui-design-agent'}, 'unexpected marketplace source')
             registration_started = True
             run([codex, 'plugin', 'marketplace', 'add', source, '--ref', commit, '--json'], env)
             added = json.loads(run([codex, 'plugin', 'add', IDENTITY, '--json'], env))
+            require(isinstance(added, dict), 'plugin add must return an object')
+            require(isinstance(added.get('installedPath'), str) and added['installedPath'], 'plugin add omitted installed path')
             listing = json.loads(run([codex, 'plugin', 'list', '--marketplace', MARKETPLACE, '--json'], env))
             enabled = enabled_plugin(listing)
             require(enabled is not None and enabled.get('pluginId', IDENTITY) == IDENTITY, 'plugin list did not confirm enabled installation')
             # The cache is host-owned; accept only the single byte-identical package.
             cache = target_home / 'plugins/cache' / MARKETPLACE / 'ui-design-agent'
-            require(isinstance(added.get('installedPath'), str), 'plugin add omitted installed path')
             installed = Path(added['installedPath']).resolve()
             require(installed.is_relative_to(cache.resolve()), 'installed path outside expected cache')
             verify(installed)

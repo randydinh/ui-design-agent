@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import io
 from pathlib import Path
 import shutil
 import subprocess
@@ -102,6 +103,50 @@ class InstallerTests(unittest.TestCase):
     def test_enabled_readback(self):
         self.assertIsNotNone(install.enabled_plugin({'installed': [{'name': 'ui-design-agent', 'enabled': True}]}))
         self.assertIsNone(install.enabled_plugin({'installed': [{'name': 'ui-design-agent', 'enabled': False}]}))
+    def test_malformed_plugin_list_types(self):
+        for value in (None, [], 'invalid', 1, {}, {'installed': {}}, {'installed': [None]}, {'installed': [{'name': [], 'enabled': True}]}, {'installed': [{'name': 'ui-design-agent', 'enabled': 'true'}]}):
+            with self.subTest(value=value), self.assertRaises(verify.VerificationError):
+                install.enabled_plugin(value)
+    def test_malformed_rpc_shapes_are_controlled(self):
+        valid = {'data': [{'skills': [], 'errors': []}]}
+        cases = [
+            [], 'invalid', 17,
+            {'id': 1, 'result': []},
+            {'id': 2, 'result': []},
+            {'id': 2, 'result': {}},
+            {'id': 2, 'result': {'data': {}}},
+            {'id': 2, 'result': {'data': [None]}},
+            {'id': 2, 'result': {'data': [{'skills': [], 'errors': None}]}},
+            {'id': 2, 'result': {'data': [{'skills': {}, 'errors': []}]}},
+            {'id': 2, 'result': {'data': [{'skills': [None], 'errors': []}]}},
+            {'id': 2, 'result': {'data': [{'skills': [{'name': 'ui-design', 'path': [], 'enabled': True}], 'errors': []}]}},
+        ]
+        for malformed in cases:
+            with self.subTest(message=malformed):
+                process = unittest.mock.Mock()
+                process.stdin = io.StringIO()
+                messages = [{'id': 1, 'result': {}}] if not isinstance(malformed, dict) or malformed.get('id') != 1 else []
+                messages.append(malformed)
+                process.stdout = io.StringIO(''.join(json.dumps(item) + '\n' for item in messages))
+                process.poll.return_value = 0
+                with patch.object(subprocess, 'Popen', return_value=process):
+                    with self.assertRaises((verify.VerificationError, install.InstallError)):
+                        install.discover('codex', {}, '.', Path('/unavailable/SKILL.md'))
+    def test_malformed_cli_result_gets_registration_warning(self):
+        for stage, value in [('add', []), ('add', None), ('add', {'installedPath': []}), ('list', []), ('list', {'installed': [None]})]:
+            with self.subTest(stage=stage, value=value), tempfile.TemporaryDirectory() as home:
+                def fake_run(args, env, timeout=90):
+                    if 'clone' in args:
+                        shutil.copytree(ROOT, Path(args[-1]), ignore=shutil.ignore_patterns('.git', '__pycache__'))
+                        return ''
+                    if 'rev-parse' in args:
+                        return 'a' * 40
+                    if args[:3] == ['codex', 'plugin', stage]:
+                        return json.dumps(value)
+                    return json.dumps({'installedPath': '/unused'})
+                with patch.object(install, 'run', side_effect=fake_run):
+                    with self.assertRaisesRegex(install.InstallError, 'Registration may remain'):
+                        install.install(install.SOURCE, 'a' * 40, codex_home=home)
     def test_failure_before_registration(self):
         with tempfile.TemporaryDirectory() as home, patch.object(install, 'run', side_effect=install.InstallError('clone failed')):
             with self.assertRaisesRegex(install.InstallError, 'Nothing was registered'):
